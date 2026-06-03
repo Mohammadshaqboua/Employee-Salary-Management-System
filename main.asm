@@ -84,6 +84,20 @@ slipLblNet      BYTE "Net Salary : ",0
 slipLblBracket  BYTE "Tax Bracket: Bracket ",0
 slipJOD         BYTE " JOD",0
 
+; ========= Department Statistics & Histogram Strings ==========
+statsHeader     BYTE "          DEPARTMENT STATISTICS",0
+statsLblDept    BYTE "Dept ",0
+statsLblCount   BYTE "  Count: ",0
+statsLblTotal   BYTE "  Total: ",0
+statsLblMin     BYTE "  Min:   ",0
+statsLblMax     BYTE "  Max:   ",0
+histHeader      BYTE "          SALARY HISTOGRAM",0
+histBracket1    BYTE "Bracket 1 (<500)   : ",0
+histBracket2    BYTE "Bracket 2 (500-999) : ",0
+histBracket3    BYTE "Bracket 3 (1000-1499): ",0
+histBracket4    BYTE "Bracket 4 (1500-1999): ",0
+histBracket5    BYTE "Bracket 5 (2000+)   : ",0
+
 
 .code
 
@@ -237,6 +251,9 @@ ValidateDeductions ENDP
 
 
 
+
+
+
 ;====================================================================
 ; FindEmployeeByID: Linear search through employee array
 ; Input:  EAX = Target ID to search for
@@ -277,11 +294,6 @@ SearchDone:
     pop     ebx
     ret
 FindEmployeeByID ENDP
-
-
-
-
-
 
 
 ;====================================================================
@@ -345,10 +357,6 @@ SetBracket:
 UpdateStatistics ENDP
 
 
-
-
-
-
 ;====================================================================
 ; MainMenu: Display main menu and read user choice
 ; Output: EAX = user choice (1-4)
@@ -403,102 +411,80 @@ AddEmployee PROC
                             call    Crlf
                             ret
 
-    CanAdd:
-                            mov     edx, offset promptName                             ;prompt for employee name
+CanAdd:
+                            ; --- Input Name ---
+                            mov     edx, offset promptName
                             call    WriteString
                             mov     edx, offset tempName
-                            mov     ecx, 20                                            ;max 20 characters
+                            mov     ecx, 20
                             call    ReadString
 
-    GetID:
-                            mov     edx, offset promptID                               ;prompt for employee ID
+                            ; --- Input ID ---
+GetID:
+                            mov     edx, offset promptID
                             call    WriteString
                             call    ReadInt
-                            mov     tempID, eax                                        ;save entered ID
-                            call    ValidateID                                         ;validate the ID
+                            mov     tempID, eax
+                            call    ValidateID
                             cmp     eax, 0
-                            je      GetID                                              ;if invalid re-prompt
+                            je      GetID
 
-    GetDept:
-                            mov     edx, offset promptDept                             ;prompt for department code
+                            ; --- Input Dept ---
+GetDept:
+                            mov     edx, offset promptDept
                             call    WriteString
                             call    ReadInt
-                            mov     tempDept, eax                                      ;save entered department
-                            call    ValidateDepartment                                 ;validate department
-                            cmp     eax, 0
-                            je      GetDept                                            ;if invalid re-prompt
-    GetSalary :
+mov     tempDept, eax
+
+call    ValidateDepartment
+cmp     eax, 0
+je      GetDept
+
+                            ; --- Input Salary ---
+GetSalary:
                             mov     edx, offset promptSalary
                             call    WriteString
                             call    ReadInt
-                            mov     tempSalary, eax         ; save BEFORE ValidateSalary overwrites EAX
+                            mov     tempSalary, eax
                             call    ValidateSalary
                             cmp     eax, 0
-                            je      ShowSalaryError
-                            jmp     SalaryDone
-    ShowSalaryError:
-                            mov     edx, offset errSalary
-                            call    WriteString
-                            call    Crlf
-                            jmp     GetSalary
-
-    SalaryDone:
-
-            ; ========== ALLOWANCES ==========
-    GetAllow :
+                            je      GetSalary
+                            ; --- Input Allowances ---
+GetAllow:
                             mov     edx, offset promptAllow
                             call    WriteString
                             call    ReadInt
-                            mov     tempAllow, eax          ; save BEFORE ValidateAllowances overwrites EAX
+                            mov     tempAllow, eax
                             call    ValidateAllowances
                             cmp     eax, 0
-                            je      ShowAllowError
-                            jmp     AllowDone
+                            je      GetAllow
 
-    ShowAllowError : 
-                            mov edx , offset errAllow
-                            call ShowError
-                            jmp GetAllow
-    AllowDone:
-
-
-        ; ========== DEDUCTIONS ==========
+                            ; --- Input Deductions ---
 GetDeduct:
                             mov     edx, offset promptDeduct
                             call    WriteString
                             call    ReadInt
-                            mov     tempDeduct, eax         ; save BEFORE ValidateDeductions overwrites EAX
+                            mov     tempDeduct, eax
                             call    ValidateDeductions
                             cmp     eax, 0
-                            je      ShowDeductError
-                            jmp     DeductDone
+                            je      GetDeduct
 
-ShowDeductError:
-                            mov     edx, offset errDeduct
-                            call    ShowError
-                            jmp     GetDeduct
+                            ; --- Calculate Net Salary ---
+                            mov     ebx, tempSalary
+                            mov     ecx, tempAllow
+                            mov     edx, tempDeduct
+                            call    CalcNetSalary
+                            mov     tempNet, eax
 
-DeductDone:
-
-; ----- Calculate Net Salary -----
-                            mov     ebx, tempSalary     ; Load Basic Salary into EBX
-                            mov     ecx, tempAllow      ; Load Allowances into ECX
-                            mov     edx, tempDeduct     ; Load Deductions into EDX
-                            call    CalcNetSalary       ; Calculate: EAX = Basic + Allow - Deduct
-                            mov     tempNet, eax        ; Save result in tempNet
-
-                                ; ----- Update Statistics -----
-                            mov     eax, tempNet        ; EAX = net salary
-                            mov     ebx, tempDept       ; EBX = department code
+                            ; --- Update Statistics ---
+                            mov     ebx, tempDept
                             call    UpdateStatistics
 
-                            ; ----- Store Record in empArray -----
+                            ; --- Store in Array ---
                             mov     eax, empCount
-                            mov     ecx, RECORD_SIZE
-                            mul     ecx
-                            mov     edi, eax
-                        
-                            ; Copy name (20 bytes)
+                            imul    edi, eax, RECORD_SIZE
+                            
+                            ; Store Name (offset 0)
                             mov     esi, OFFSET tempName
                             lea     edx, empArray[edi]
                             mov     ecx, 20
@@ -529,28 +515,20 @@ CopyNameLoop:
                             mov     eax, tempDeduct
                             mov     DWORD PTR empArray[edi + 36], eax
 
-    ; Store Net Salary (offset 40)
-    mov     eax, tempNet
-    mov     DWORD PTR empArray[edi + 40], eax
+                            ; Store Net Salary (offset 40)
+                            mov     eax, tempNet
+                            mov     DWORD PTR empArray[edi + 40], eax
 
-    ; Increment Counter
-    inc     empCount
+                            ; Increment Counter
+                            inc     empCount
 
-    ; ----- Success Message -----
+                            ; ----- Success Message -----
                             mov     edx, offset successAdd
                             call    WriteString
                             call    Crlf
 
                             ret
-
-
-    
-
 AddEmployee ENDP
-
-
-
-
 
 ;====================================================================
 ; DisplayPaySlip: Ask for employee ID, find record, print pay slip
@@ -703,6 +681,146 @@ DisplayPaySlip ENDP
 
 
 ;====================================================================
+; DisplayDepartmentStats: Show stats for all 5 departments
+;====================================================================
+DisplayDepartmentStats PROC
+    call    Clrscr
+    mov     edx, OFFSET slipBorder
+    call    WriteString
+    call    Crlf
+    mov     edx, OFFSET statsHeader
+    call    WriteString
+    call    Crlf
+    mov     edx, OFFSET slipBorder
+    call    WriteString
+    call    Crlf
+
+    mov     esi, 0              ; Department index (0-4)
+PrintStatsLoop:
+    ; Print "Dept X"
+    mov     edx, OFFSET statsLblDept
+    call    WriteString
+    mov     eax, esi
+    inc     eax                 ; Display as 1-5
+    call    WriteDec
+    call    Crlf
+
+    ; Print Count
+    mov     edx, OFFSET statsLblCount
+    call    WriteString
+    mov     eax, deptCount[esi*4]
+    call    WriteDec
+    call    Crlf
+
+    ; Print Total
+    mov     edx, OFFSET statsLblTotal
+    call    WriteString
+    mov     eax, deptTotal[esi*4]
+    call    WriteDec
+    mov     edx, OFFSET slipJOD
+    call    WriteString
+    call    Crlf
+
+    ; Print Min
+    mov     edx, OFFSET statsLblMin
+    call    WriteString
+    mov     eax, deptMin[esi*4]
+    cmp     eax, 99999          ; Check if initialized
+    jne     ShowMin
+    mov     eax, 0
+ShowMin:
+    call    WriteDec
+    mov     edx, OFFSET slipJOD
+    call    WriteString
+    call    Crlf
+
+    ; Print Max
+    mov     edx, OFFSET statsLblMax
+    call    WriteString
+    mov     eax, deptMax[esi*4]
+    call    WriteDec
+    mov     edx, OFFSET slipJOD
+    call    WriteString
+    call    Crlf
+
+    mov     edx, OFFSET slipSubLine
+    call    WriteString
+    call    Crlf
+
+    inc     esi
+    cmp     esi, 5
+    jl      PrintStatsLoop
+
+    call    Crlf
+    call    DisplayHistogram    ; Call histogram as part of stats
+    ret
+DisplayDepartmentStats ENDP
+
+;====================================================================
+; DisplayHistogram: Display salary distribution
+;====================================================================
+DisplayHistogram PROC
+    mov     edx, OFFSET slipBorder
+    call    WriteString
+    call    Crlf
+    mov     edx, OFFSET histHeader
+    call    WriteString
+    call    Crlf
+    mov     edx, OFFSET slipBorder
+    call    WriteString
+    call    Crlf
+
+    mov     esi, 0              ; Bracket index
+PrintHistLoop:
+    ; Select label based on ESI
+    cmp     esi, 0
+    je      Lbl1
+    cmp     esi, 1
+    je      Lbl2
+    cmp     esi, 2
+    je      Lbl3
+    cmp     esi, 3
+    je      Lbl4
+    mov     edx, OFFSET histBracket5
+    jmp     PrintLabel
+Lbl1:
+ mov edx, OFFSET histBracket1
+    jmp     PrintLabel
+Lbl2:
+ mov edx, OFFSET histBracket2
+    jmp     PrintLabel
+Lbl3:
+ mov edx, OFFSET histBracket3
+    jmp     PrintLabel
+Lbl4: 
+mov edx, OFFSET histBracket4
+
+PrintLabel:
+    call    WriteString
+    
+    ; Print stars
+    mov     ecx, bracketCount[esi*4]
+    cmp     ecx, 0
+    je      NoStars
+StarLoop:
+    mov     al, '*'
+    call    WriteChar
+    loop    StarLoop
+NoStars:
+    call    Crlf
+    
+    inc     esi
+    cmp     esi, 5
+    jl      PrintHistLoop
+
+    mov     edx, OFFSET slipBorder
+    call    WriteString
+    call    Crlf
+    ret
+DisplayHistogram ENDP
+
+
+;====================================================================
 ; main: Program entry point
 ;====================================================================
 main PROC
@@ -735,7 +853,10 @@ main PROC
                             jmp     MainLoop
 
     DoStats:
-                            ; call DisplayDepartmentStats <- Husam Worked
+                            call    DisplayDepartmentStats
+                            mov     edx, offset pressKey
+                            call    WriteString
+                            call    ReadChar
                             jmp     MainLoop
 
     DoExit:
@@ -743,5 +864,3 @@ main PROC
 
 main ENDP
 END main
-
-End main
