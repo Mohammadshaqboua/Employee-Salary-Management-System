@@ -67,6 +67,9 @@ successAdd      BYTE "Employee added successfully!",0
 pressKey        BYTE "Press any key to continue...",0
 errAllow        BYTE "ERROR: Allowances must be between 0 and 5000 JOD!",0
 errDeduct       BYTE "ERROR: Deductions must be between 0 and 3000 JOD!",0
+errNegative     BYTE "ERROR: Value cannot be negative!",0
+errBelowMin     BYTE "ERROR: Value is below the minimum allowed!",0
+errAboveMax     BYTE "ERROR: Value exceeds the maximum allowed!",0
 
 ; ============ Pay Slip ============
 promptPaySlip   BYTE "Enter Employee ID for Pay Slip: ",0
@@ -83,6 +86,7 @@ slipLblDeduct   BYTE "Deductions : ",0
 slipLblNet      BYTE "Net Salary : ",0
 slipLblBracket  BYTE "Tax Bracket: Bracket ",0
 slipJOD         BYTE " JOD",0
+errNegNet       BYTE "Error: Deductions exceed Basic+Allowances. Net cannot be negative.",0
 
 ; ========= Department Statistics & Histogram Strings ==========
 statsHeader     BYTE "          DEPARTMENT STATISTICS",0
@@ -170,14 +174,34 @@ ValidateDepartment ENDP
 ; Output: EAX = 1 (valid) or 0 (invalid)
 ;====================================================================
 ValidateSalaryRange PROC
+    cmp     eax, 0              ; Is value negative?
+    jl      NegativeVal         ; Yes → show specific error
+
     cmp     eax, ebx            ; Is value < minimum?
-    jl      Invalid             ; Yes → jump to Invalid label
+    jl      BelowMin            ; Yes → below minimum error
     cmp     eax, ecx            ; Is value > maximum?
     jg      Invalid             ; Yes → jump to Invalid label
     mov     eax, 1              ; No to both → valid!
     ret
 
+NegativeVal:
+    mov     edx, offset errNegative
+    call    WriteString
+    call    Crlf
+    mov     eax, 0              ; Return 0 (invalid)
+    ret
+
+BelowMin:
+    mov     edx, offset errBelowMin
+    call    WriteString
+    call    Crlf
+    mov     eax, 0              ; Return 0 (invalid)
+    ret
+
 Invalid:
+    mov     edx, offset errAboveMax
+    call    WriteString
+    call    Crlf
     mov     eax, 0              ; Return 0 (invalid)
     ret
 ValidateSalaryRange ENDP
@@ -474,6 +498,13 @@ GetDeduct:
                             mov     ecx, tempAllow
                             mov     edx, tempDeduct
                             call    CalcNetSalary
+                            cmp     eax, 80000000h
+                            jb      NetOK
+                            mov     edx, OFFSET errNegNet
+                            call    WriteString
+                            call    Crlf
+                            jmp     GetDeduct
+NetOK:
                             mov     tempNet, eax
 
                             ; --- Update Statistics ---
@@ -624,7 +655,7 @@ DisplayPaySlip PROC
     mov     edx, OFFSET slipLblNet
     call    WriteString
     mov     eax, DWORD PTR empArray[edi + 40]
-    call    WriteDec
+    call    WriteInt
     mov     edx, OFFSET slipJOD
     call    WriteString
     call    Crlf
