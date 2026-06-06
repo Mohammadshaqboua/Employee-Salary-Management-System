@@ -8,9 +8,9 @@
  
 | Name | 
 |------|
-| Mohammad Shaqboua |
-| Mohammad Dawas |
-| Husam Ziadeh |
+| [Mohammad Shaqboua](https://github.com/Mohammadshaqboua) |
+| [Mohammad Dawas](https://github.com/DAWAS00) |
+| [Husam Ziadeh](https://github.com/husamziadeh2005) |
  
 ---
  
